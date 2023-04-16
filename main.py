@@ -13,12 +13,14 @@ from models.hungary import HungarianMatcher
 
 def set_random_seed(seed):
     random.seed(seed)
+    # ZFC 统一各Python Interpreter之间的Hash计算方法，保证它们在计算同一个对象时hash值相同，参考：https://zhuanlan.zhihu.com/p/456306448
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # ZFC 以下二者相配合 --> 保证卷积计算的一致性
+    torch.backends.cudnn.deterministic = True  # 固定的卷积算法因其实现不同 --> 也可能不受控制(结果可能有细微差别)，deterministic = True 保证使用确定性的卷积算法
+    torch.backends.cudnn.benchmark = False  # ZFC benchmark = False -- 保证使用固定的卷积算法 --> 禁用卷积算法的选择机制
 
 
 if __name__ == '__main__':

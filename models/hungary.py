@@ -3,6 +3,7 @@ from torch import nn, Tensor
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
+# ZFC 匈牙利算法(二分图)参考：https://zhuanlan.zhihu.com/p/96229700
 class HungarianMatcher(nn.Module):
     """This class computes an assignment between the targets and the predictions of the network
     For efficiency reasons, the targets don't include the no_object. Because of this, in general,
@@ -32,9 +33,13 @@ class HungarianMatcher(nn.Module):
         sizes = [len(item['nouns']) for item in nouns_dict_list]
         nouns_semantics = torch.cat([item['vec'][:len(item['nouns'])] for item in nouns_dict_list]).to(device)  # (\sigma nouns, word_dim)
         nouns_length = torch.norm(nouns_semantics, dim=-1, keepdim=True)  # (\sigma nouns, 1)
+        # ZFC flatten(0, 1) 将 0~1 维的参数铺平 --> salient_objects 的前两维由 bsz, max_objects --> bsz * max_objects
         salient_objects = salient_objects.flatten(0, 1)  # (bsz * max_objects, word_dim)
+        # ZFC torch.norm 求最后一维(-1指定)的向量范数，将最后一维转为范数，参考：https://zhuanlan.zhihu.com/p/260162240
         salient_length = torch.norm(salient_objects, dim=-1, keepdim=True)  # (bsz * max_objects, 1)
+        # ZFC .permute 维度交换：nouns_length 的维度由 (\sigma nouns, 1) 变为 (1, \sigma nouns)
         matrix_length = salient_length * nouns_length.permute([1, 0]) + self.eps  # (bsz * max_objects, \sigma nouns)
+        # ZFC 由上可知维度变化过程为：(bsz * max_objects, 1) * (1, \sigma nouns) --> (bsz * max_objects, \sigma nouns)
 
 
         cos_matrix = torch.mm(salient_objects, nouns_semantics.permute([1, 0]))  # (bsz * max_objects, \sigma nouns)

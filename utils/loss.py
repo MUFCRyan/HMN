@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-
+# ZFC to_contiguous: Tensor底层一维数组元素的存储顺序与Tensor按行优先一维展开的元素顺序，参考：https://zhuanlan.zhihu.com/p/64551412
 def to_contiguous(tensor):
     if tensor.is_contiguous():
         return tensor

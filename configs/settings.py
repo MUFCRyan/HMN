@@ -62,6 +62,7 @@ def _settings():
     """
     =========================Training Settings===========================
     """
+    # ZFC grad_clip -- 梯度裁剪：通过裁剪将梯度控制在一定的范围内、防止梯度爆炸，参考：https://zhuanlan.zhihu.com/p/353871841
     parser.add_argument('--grad_clip', type=float, default=5.0)
     parser.add_argument('--learning_rate', type=float, default=1e-4)
     parser.add_argument('--lambda_entity', type=float, default=1.0)
@@ -78,6 +79,8 @@ def _settings():
     """
     parser.add_argument('--beam_size', type=int, default=5)
     parser.add_argument('--max_caption_len', type=int, default=20 + 2)
+    # ZFC 用于控制生成语言模型中生成文本的随机性和创造性、调整模型的softmax输出层中预测词的概率；该值较低时 --> 产生更保守和可预测的文本，
+    #     反之产生更有创意和多样化的文本；一般取值范围=[0.1, 1]，参考：https://zhuanlan.zhihu.com/p/615675305
     parser.add_argument('--temperature', type=float, default=1.0)
     parser.add_argument('--result_path', type=str, default='-1')
 
@@ -121,15 +124,20 @@ class DataConfigs:
 
         # language part
         self.language_dir = os.path.join(self.data_dir, 'language')
+        # ZFC .pkl文件：Python的一种文件格式，可将python项目过程中用到的一些临时变量、或需要提取 or 暂存的字符串 | 列表 | 字典等数据存起来
+        # ZFC vid2language = video to language
         self.vid2language_path = os.path.join(self.language_dir, 'vid2language.pkl')
+        # ZFC vid2fillmask = video to fill mask
         self.vid2fillmask_path = os.path.join(self.data_dir, 'vid2fillmask_{}.pkl'.format(self.dataset_name))
         self.word2idx_path = os.path.join(self.language_dir, 'word2idx.pkl')
         self.idx2word_path = os.path.join(self.language_dir, 'idx2word.pkl')
         self.embedding_weights_path = os.path.join(self.language_dir, 'embedding_weights.pkl')
+        # ZFC vid2groundtruth = video to groundtruth
         self.vid2groundtruth_path = os.path.join(self.language_dir, 'vid2groundtruth.pkl')
 
         # visual part
         self.visual_dir = os.path.join(self.data_dir, 'visual')
+        # ZFC .hdf5文件：常见的跨平台数据存储文件
         self.backbone2d_path_tpl = os.path.join(self.visual_dir, '{}_{}_{}.hdf5'.format(args.dataset_name, args.backbone_2d_name, '{}'))
         self.backbone3d_path_tpl = os.path.join(self.visual_dir, '{}_{}_{}.hdf5'.format(args.dataset_name, args.backbone_3d_name, '{}'))
         self.objects_path_tpl = os.path.join(self.visual_dir, '{}_{}_{}.hdf5'.format(args.dataset_name, args.object_name, '{}'))
