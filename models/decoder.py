@@ -68,10 +68,15 @@ class Decoder(nn.Module):
         self.logit.weight.data.uniform_(-init_range, init_range)
 
     def forward(self, objects, action, video, object_semantics, action_semantics, video_semantics, embed, last_states):
+        # ZFC h^{lang}_{t-1}
         last_hidden = last_states[0][0]  # (bsz, hidden_dim)
+        # ZFC W^T_d * h^{lang}_{t-1}
         Wh = self.W(last_hidden)  # (bsz, hidden_dim)
+        # ZFC 处理 Entity特征 U^T_d * e_k
         U_obj = self.Uo(objects) if hasattr(self, 'Uo') else None  # (bsz, max_objects, hidden_dim)
+        # ZFC 处理 Entity Semantic 特征
         U_objs = self.Uos(object_semantics) if hasattr(self, 'Uos') else None  # (bsz, max_objects, emb_dim)
+        # ZFC 处理 Predicate action 特征
         U_action = self.Um(action) if hasattr(self, 'Um') else None  # (bsz, sample_numb, hidden_dim)
         U_video = self.Uv(video) if hasattr(self, 'Uv') else None  # (bsz, sample_numb, hidden_dim)
 
@@ -84,6 +89,7 @@ class Decoder(nn.Module):
         else:
             attn_objects = None
 
+        # ZFC action feature
         if U_action is not None:
             attn_weights = self.wm(torch.tanh(Wh[:, None, :] + U_action + self.bm))
             attn_weights = attn_weights.softmax(dim=1)  # (bsz, sample_numb, 1)
@@ -92,6 +98,7 @@ class Decoder(nn.Module):
         else:
             attn_motion = None
 
+        # ZFC object feature = Entity feature
         if U_video is not None:
             attn_weights = self.wv(torch.tanh(Wh[:, None, :] + U_video + self.bv))
             attn_weights = attn_weights.softmax(dim=1)  # (bsz, sample_numb, 1)

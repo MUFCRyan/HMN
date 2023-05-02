@@ -25,6 +25,11 @@ class SentenceLevelEncoder(nn.Module):
                             num_layers=1, bidirectional=True, batch_first=True)
         self.fc_layer = nn.Linear(hidden_dim, semantics_dim)
 
+    """
+    ZFC feature2ds -- video context feature --> C
+        vp_features -- context-related action feature --> C^a
+        object_features -- context-related object feature --> C^e
+    """
     def forward(self, feature2ds: Tensor, vp_features: Tensor, object_features: Tensor, objects_mask: Tensor):
         """
 
@@ -39,9 +44,13 @@ class SentenceLevelEncoder(nn.Module):
             video_pending: (bsz, semantics_dim)
         """
         sample_numb = feature2ds.shape[1]
+        # ZFC 建立 feature2d_dim --> hidden_dim 的投影关系
         feature2ds = self.linear_2d(feature2ds)
+        # ZFC W^T_g * c_i
         W_f2d = self.W(feature2ds)
+        # ZFC U^T_g * e_k
         U_objs = self.Uo(object_features)
+        # ZFC U^T_g * a_k
         U_motion = self.Um(vp_features)
 
         attn_feat = W_f2d.unsqueeze(2) + U_objs.unsqueeze(1) + self.bo  # (bsz, sample_numb, max_objects, hidden_dim)

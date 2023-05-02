@@ -36,35 +36,41 @@ class Transformer(nn.Module):
 
     def forward(self, src, tgt, mask, query_embed, pos_embed=None):
         bs, detected_num, c = src.shape
+        # ZFC 「batch_size」 与 「每个视频中最大目标数量」 两个维度换位
         src = src.permute(1, 0, 2)  # (max_objects_per_video, bsz, object_feats_dim)
         # pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
+        # ZFC 先在index=1的位置扩展一个shape=1的维度，然后将该维度的数据复制 batch_size 份
         query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
+        # ZFC 将mask张量从index=1开始的维度压平
         mask = mask.flatten(1)
-
+        # ZFC 使用 Encoder 编码，得到输出 memory
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+        # ZFC 使用 Decoder 解码，得到 HiddenState
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
+        # ZFC 将 HS 的二、三维转置 & memory 做维度交换并调整shape为(batch_size, channel, objects_number)
         return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, detected_num)
 
 
+# ZFC 堆叠多层 EncoderLayer 得到
 class TransformerEncoder(nn.Module):
 
     def __init__(self, encoder_layer, num_layers, norm=None):
         super().__init__()
-        self.layers = _get_clones(encoder_layer, num_layers)
+        self.layers = _get_clones(encoder_layer, num_layers)  # ZFC 堆叠 num_layers 层 Encoder Layer
         self.num_layers = num_layers
         self.norm = norm
 
     def forward(self, src,
-                mask: Optional[Tensor] = None,
+                mask: Optional[Tensor] = None,  # ZFC 实际 mask = None
                 src_key_padding_mask: Optional[Tensor] = None,
                 pos: Optional[Tensor] = None):
         output = src
-
+        # ZFC 遍历将各层连接起来
         for layer in self.layers:
             output = layer(output, src_mask=mask,
                            src_key_padding_mask=src_key_padding_mask, pos=pos)
-
+        # 添加一个 Norm
         if self.norm is not None:
             output = self.norm(output)
 
@@ -80,10 +86,12 @@ class TransformerDecoder(nn.Module):
         self.norm = norm
         self.return_intermediate = return_intermediate
 
-    def forward(self, tgt, memory,
+    def forward(self, tgt, memory,  # memory 实际就是 Encoder 的最终 outputs
+                # ZFC 实际 tgt_mask、memory_mask、tgt_key_padding_mask 均 = None ------
                 tgt_mask: Optional[Tensor] = None,
                 memory_mask: Optional[Tensor] = None,
                 tgt_key_padding_mask: Optional[Tensor] = None,
+                # ZFC ---------------------------------------------------------------
                 memory_key_padding_mask: Optional[Tensor] = None,
                 pos: Optional[Tensor] = None,
                 query_pos: Optional[Tensor] = None):
@@ -112,6 +120,7 @@ class TransformerDecoder(nn.Module):
         return output.unsqueeze(0)
 
 
+# ZFC 标准 TransformerEncoderLayer
 class TransformerEncoderLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
@@ -132,19 +141,26 @@ class TransformerEncoderLayer(nn.Module):
         self.normalize_before = normalize_before
 
     def with_pos_embed(self, tensor, pos: Optional[Tensor]):
-        return tensor if pos is None else tensor + pos
+        return tensor if pos is None else tensor + pos  # ZFC Position Embedding 与 inputs 直接拼接
 
     def forward_post(self,
                      src,
                      src_mask: Optional[Tensor] = None,
                      src_key_padding_mask: Optional[Tensor] = None,
                      pos: Optional[Tensor] = None):
-        q = k = self.with_pos_embed(src, pos)
+        # ZFC 1. 用具有 Position Embedding 的 inputs 初始化 Q、K，而 V = src = inputs
+        q = k = self.with_pos_embed(src, pos)  # ZFC Q=K=(V+PosEmbed)
+        # ZFC 2. 基于 Q、K、V 计算多头注意力
         src2 = self.self_attn(q, k, value=src, attn_mask=src_mask,
                               key_padding_mask=src_key_padding_mask)[0]
+        # ZFC 3. Add + Norm
+        #   ZFC 3.1 Add = inputs + Dropout(inputs) = 残差连接
         src = src + self.dropout1(src2)
+        #   ZFC 3.2 Norm
         src = self.norm1(src)
+        # ZFC 4. FFN
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
+        # ZFC 5. Add + Norm
         src = src + self.dropout2(src2)
         src = self.norm2(src)
         return src
@@ -172,6 +188,7 @@ class TransformerEncoderLayer(nn.Module):
         return self.forward_post(src, src_mask, src_key_padding_mask, pos)
 
 
+# ZFC 标准 TransformerDecoderLayer
 class TransformerDecoderLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
@@ -197,25 +214,35 @@ class TransformerDecoderLayer(nn.Module):
     def with_pos_embed(self, tensor, pos: Optional[Tensor]):
         return tensor if pos is None else tensor + pos
 
-    def forward_post(self, tgt, memory,
+    def forward_post(self, tgt, memory,  # memory 实际就是 Encoder 的最终 outputs
                      tgt_mask: Optional[Tensor] = None,
                      memory_mask: Optional[Tensor] = None,
                      tgt_key_padding_mask: Optional[Tensor] = None,
                      memory_key_padding_mask: Optional[Tensor] = None,
                      pos: Optional[Tensor] = None,
                      query_pos: Optional[Tensor] = None):
+        # ZFC 1. 生成 Q、K、V
         q = k = self.with_pos_embed(tgt, query_pos)
+        # ZFC 2. 计算 Masked 多头自注意力
         tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask,
                               key_padding_mask=tgt_key_padding_mask)[0]
+        # ZFC 3. Add + Norm
+        #   ZFC 3.1 Add = target + Dropout(target) = 残差连接
         tgt = tgt + self.dropout1(tgt2)
+        #   ZFC 3.2 Norm
         tgt = self.norm1(tgt)
+        # ZFC 4. 计算第二个多头注意力：Q = target+PosEmbed；
         tgt2 = self.multihead_attn(query=self.with_pos_embed(tgt, query_pos),
-                                   key=self.with_pos_embed(memory, pos),
-                                   value=memory, attn_mask=memory_mask,
+                                   # ZFC K、V 除在 Decoder 的第一层全部来自 Decoder 外，其余层均为 Encoder 的 outputs
+                                   key=self.with_pos_embed(memory, pos), value=memory,
+                                   attn_mask=memory_mask,
                                    key_padding_mask=memory_key_padding_mask)[0]
+        # ZFC 5. Add + Norm
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
+        # ZFC 6. FFN
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
+        # ZFC 7. Add + Norm
         tgt = tgt + self.dropout3(tgt2)
         tgt = self.norm3(tgt)
         return tgt

@@ -128,7 +128,7 @@ class DataConfigs:
         # ZFC vid2language = video to language
         self.vid2language_path = os.path.join(self.language_dir, 'vid2language.pkl')
         # ZFC vid2fillmask = video to fill mask
-        self.vid2fillmask_path = os.path.join(self.data_dir, 'vid2fillmask_{}.pkl'.format(self.dataset_name))
+        self.vid2fillmask_path = os.path.join(self.language_dir, 'vid2fillmask_{}.pkl'.format(self.dataset_name))
         self.word2idx_path = os.path.join(self.language_dir, 'word2idx.pkl')
         self.idx2word_path = os.path.join(self.language_dir, 'idx2word.pkl')
         self.embedding_weights_path = os.path.join(self.language_dir, 'embedding_weights.pkl')

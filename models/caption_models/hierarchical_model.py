@@ -54,8 +54,11 @@ class HierarchicalModel(CaptionModule):
             action_semantics: (bsz, semantics_dim)
             video_semantics: (bsz, semantics_dim)
         """
+        # ZFC 从 EntityLevel 抽取 object feature、semantic
         objects_feats, objects_semantics = self.entity_level(feature2ds, feature3ds, objects, objects_mask)
+        # ZFC 从 PredicateLevel 抽取 action feature、semantic
         action_feats, action_semantics = self.predicate_level(feature3ds, objects_feats, objects_mask)
+        # ZFC 从 SentenceLevel 抽取 video feature、semantic
         video_feats, video_semantics = self.sentence_level(feature2ds, action_feats, objects_feats, objects_mask)
 
         return objects_feats, action_feats, video_feats, objects_semantics, action_semantics, video_semantics
@@ -96,6 +99,7 @@ class HierarchicalModel(CaptionModule):
         state = self.get_rnn_init_hidden(bsz=bsz, hidden_size=self.decoder.hidden_dim, device=device)
         outputs = []
 
+        # ZFC for循环逐步生成 output 的 word
         for i in range(self.max_caption_len):
             if i > 0 and numberic_captions[:, i].sum() == 0:
                 output_word = torch.zeros([bsz, n_vocab]).cuda()
